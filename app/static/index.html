@@ -198,23 +198,6 @@ function render(md, sources) {
   return html;
 }
 
-function sourceCards(items, id) {
-  if (!items.length) return "";
-  return `<div class="sources">` + items.map((s, i) => {
-    const price = s.price_sar ? `<span class="price">${fmtSAR(s.price_sar)}</span>`
-      : `<span class="price muted">${s.source === "darglobal" && s.doc_type === "project" ? "Price on request" : "Price not listed"}</span>`;
-    const facts = [s.bedrooms && `${s.bedrooms} bed`, s.area_sqm && `${s.area_sqm} sqm`, s.status, s.purpose === "rent" && "For rent"]
-      .filter(Boolean).join(", ");
-    const origin = s.source === "darglobal" ? "darglobal.co.uk" : "wasalt.sa";
-    const body = `<span class="n">${i + 1}</span>${price}<span class="title">${esc(s.title)}</span>` +
-      (s.location ? `<span class="where">${esc(s.location)}</span>` : "") +
-      (facts ? `<span class="meta">${esc(facts)}</span>` : "") +
-      `<span class="origin">${s.url ? "View on " : ""}${origin}</span>`;
-    return s.url
-      ? `<a class="tag" id="src-${id}-${i + 1}" href="${esc(s.url)}" target="_blank" rel="noopener">${body}</a>`
-      : `<div class="tag" id="src-${id}-${i + 1}">${body}</div>`;
-  }).join("") + `</div>`;
-}
 
 function add(role, html, rtl) {
   welcome.hidden = true;
@@ -238,8 +221,7 @@ async function ask(text) {
   const paint = () => {
     sources.id = id;
     answerEl.innerHTML = (notice ? `<div class="notice">${esc(notice)}</div>` : "") +
-      (answer ? render(answer, sources) : (notice ? "" : `<span class="typing">Writing the answer</span>`)) +
-      (notice ? "" : sourceCards(sources, id));
+      (answer ? render(answer, sources) : (notice ? "" : `<span class="typing">Writing the answer</span>`));
   };
   try {
     const res = await fetch("/api/chat", {
