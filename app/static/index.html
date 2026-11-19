@@ -114,6 +114,14 @@
     background: var(--ink); color: var(--stone);
   }
   .send:disabled { opacity: .45; cursor: default; }
+  .voice {
+    flex: 0 0 auto; min-width: 42px; height: 42px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .voice:hover { border-color: var(--brass); }
+  .voice.listening { background: var(--notice-bg); border-color: var(--brass); }
+  .listen { margin-top: 8px; font: 600 .82rem var(--sans); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--paper); color: var(--ink); cursor: pointer; }
+  .listen:hover { border-color: var(--brass); }
   .fine { max-width: 760px; margin: 0 auto; padding: 0 20px 10px; font-size: .74rem; color: var(--ink-soft); }
 
   @media (max-width: 560px) {
@@ -154,6 +162,7 @@
   <form id="form">
     <label for="input" class="sr-only" style="position:absolute;left:-9999px">Your question</label>
     <textarea id="input" rows="1" placeholder="Ask about a property or area" maxlength="1000"></textarea>
+    <button class="voice" id="mic" type="button" title="Speak your question" aria-label="Speak your question">Mic</button>
     <button class="send" id="send" type="submit">Ask</button>
   </form>
 </footer>
@@ -164,9 +173,11 @@ const scroller = document.getElementById("scroller");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
 const send = document.getElementById("send");
+const mic = document.getElementById("mic");
 const welcome = document.getElementById("welcome");
 let history = [];
 let busy = false;
+let recognition = null;
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtSAR = n => "SAR " + Number(n).toLocaleString("en-US");
@@ -251,6 +262,21 @@ async function ask(text) {
       if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
     }
     history.push({role: "user", content: text}, {role: "assistant", content: answer.slice(0, 5000)});
+    if (answer && "speechSynthesis" in window) {
+      const listen = document.createElement("button");
+      listen.type = "button";
+      listen.className = "listen";
+      listen.textContent = "Listen";
+      listen.setAttribute("aria-label", "Read answer aloud");
+      listen.addEventListener("click", () => {
+        speechSynthesis.cancel();
+        const spoken = answer.replace(/\[[0-9]{1,2}\]/g, "").replace(/[#*_]/g, "");
+        const utterance = new SpeechSynthesisUtterance(spoken);
+        utterance.lang = isRTL(answer) ? "ar-SA" : "en-US";
+        speechSynthesis.speak(utterance);
+      });
+      bot.appendChild(listen);
+    }
   } catch (e) {
     answerEl.innerHTML = `<div class="notice">${esc(e.message || "The answer could not be loaded. Check your connection and ask again.")}</div>`;
   } finally {
@@ -264,6 +290,34 @@ input.addEventListener("keydown", e => {
 });
 const grow = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; };
 input.addEventListener("input", grow);
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.onstart = () => mic.classList.add("listening");
+  recognition.onend = () => mic.classList.remove("listening");
+  recognition.onresult = event => {
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+    input.value = transcript;
+    grow();
+  };
+  recognition.onerror = event => {
+    mic.classList.remove("listening");
+    const message = event.error === "not-allowed" ? "Microphone access was denied." : "Voice input is unavailable. Try typing your question.";
+    add("bot", `<div class="notice">${esc(message)}</div>`, false);
+  };
+  mic.addEventListener("click", () => {
+    if (busy) return;
+    recognition.lang = isRTL(input.value) ? "ar-SA" : "en-US";
+    try { recognition.start(); } catch (_) { recognition.stop(); }
+  });
+} else {
+  mic.title = "Speech input is not supported by this browser";
+  mic.addEventListener("click", () => add("bot", `<div class="notice">Voice input is not supported by this browser. Please type your question.</div>`, false));
+}
 document.getElementById("examples").addEventListener("click", e => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); });
 document.getElementById("reset").addEventListener("click", () => {
   history = []; log.querySelectorAll(".msg").forEach(m => m.remove()); welcome.hidden = false; input.focus();
