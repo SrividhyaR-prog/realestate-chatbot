@@ -1,0 +1,11 @@
+services:
+  chatbot:
+    build: .
+    ports:
+      - "7860:7860"
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
+      OPENROUTER_FALLBACK_MODELS: ${OPENROUTER_FALLBACK_MODELS:-}
+      APP_URL: ${APP_URL:-http://localhost:7860}
+    restart: unless-stopped
